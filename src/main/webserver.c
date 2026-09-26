@@ -10,9 +10,169 @@
 
 #include "cJSON.h"
 
+#include "opensky_client.h"
+
 static const char *TAG = "WEBSERVER";
 
 #define OPENSKY_NAMESPACE "opensky"
+
+static bool IsValidDataUrl(
+    const char *url)
+{
+    if (!url ||
+        strlen(url) < 8)
+    {
+        return false;
+    }
+
+    if (strncmp(url, "http://", 7) != 0 &&
+        strncmp(url, "https://", 8) != 0)
+    {
+        return false;
+    }
+
+    /* Reject whitespace and control characters outright. */
+    for (const char *p = url; *p; p++)
+    {
+        if (*p <= ' ' ||
+            *p == '"' ||
+            *p == '\\')
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static esp_err_t SetDataHandler(
+    httpd_req_t *req)
+{
+    int totalLen = req->content_len;
+
+    if (totalLen <= 0 || totalLen > 512)
+    {
+        httpd_resp_send_err(
+            req,
+            HTTPD_500_INTERNAL_SERVER_ERROR,
+            "Invalid request");
+
+        return ESP_FAIL;
+    }
+
+    char *buffer = malloc(totalLen + 1);
+
+    if (!buffer)
+    {
+        httpd_resp_send_err(
+            req,
+            HTTPD_500_INTERNAL_SERVER_ERROR,
+            "Out of memory");
+
+        return ESP_FAIL;
+    }
+
+    int received = 0;
+
+    while (received < totalLen)
+    {
+        int ret = httpd_req_recv(
+            req,
+            buffer + received,
+            totalLen - received);
+
+        if (ret <= 0)
+        {
+            free(buffer);
+
+            httpd_resp_send_err(
+                req,
+                HTTPD_500_INTERNAL_SERVER_ERROR,
+                "Receive failed");
+
+            return ESP_FAIL;
+        }
+
+        received += ret;
+    }
+
+    buffer[received] = '\0';
+
+    cJSON *root = cJSON_Parse(buffer);
+
+    free(buffer);
+
+    if (!root)
+    {
+        httpd_resp_send(
+            req,
+            "Invalid JSON",
+            HTTPD_RESP_USE_STRLEN);
+
+        return ESP_FAIL;
+    }
+
+    cJSON *dataUrl =
+        cJSON_GetObjectItem(
+            root,
+            "dataUrl");
+
+    if (!cJSON_IsString(dataUrl))
+    {
+        cJSON_Delete(root);
+
+        httpd_resp_send(
+            req,
+            "Missing dataUrl",
+            HTTPD_RESP_USE_STRLEN);
+
+        return ESP_FAIL;
+    }
+
+    const char *url = dataUrl->valuestring;
+
+    ESP_LOGI(
+        TAG,
+        "Data source URL: '%s'",
+        url);
+
+    bool saved;
+
+    if (strlen(url) == 0)
+    {
+        /* An empty field clears the data source and returns to direct OpenSky. */
+        saved = OpenSky_SetDataUrl("");
+    }
+    else if (IsValidDataUrl(url))
+    {
+        saved = OpenSky_SetDataUrl(url);
+    }
+    else
+    {
+        saved = false;
+    }
+
+    cJSON_Delete(root);
+
+    if (strlen(url) > 0 &&
+        !saved)
+    {
+        httpd_resp_send(
+            req,
+            "Invalid URL: expected http:// or https://",
+            HTTPD_RESP_USE_STRLEN);
+
+        return ESP_FAIL;
+    }
+
+    httpd_resp_send(
+        req,
+        saved ? "Data source saved"
+              : "Save failed",
+        HTTPD_RESP_USE_STRLEN);
+
+    return ESP_OK;
+}
 
 static bool SaveCredentials(
     const char *clientId,
@@ -200,6 +360,18 @@ static esp_err_t RootHandler(
 
         "</form>"
 
+        "<h2>Radar Data Source</h2>"
+
+        "<p>URL of your merge server, e.g. http://192.168.1.50:8000/states/all.<br>"
+        "Leave empty to fetch directly from OpenSky.</p>"
+
+        "<input type='text' id='dataUrl' "
+        "placeholder='http://192.168.1.50:8000/states/all' "
+        "style='width:340px'>"
+
+        "<button type='button' "
+        "onclick='saveDataUrl()'>Save Data Source</button>"
+
         "<script>"
         "async function uploadFile(){"
 
@@ -219,6 +391,22 @@ static esp_err_t RootHandler(
         "'Content-Type':'application/json'"
         "},"
         "body:data"
+        "});"
+
+        "alert(await response.text());"
+        "}"
+
+        "async function saveDataUrl(){"
+
+        "const v="
+        "document.getElementById('dataUrl').value.trim();"
+
+        "const response=await fetch('/setdata',{"
+        "method:'POST',"
+        "headers:{"
+        "'Content-Type':'application/json'"
+        "},"
+        "body:JSON.stringify({dataUrl:v})"
         "});"
 
         "alert(await response.text());"
@@ -266,6 +454,13 @@ esp_err_t StartWebServer(void)
             .handler = UploadHandler,
             .user_ctx = NULL};
 
+    httpd_uri_t setdata_uri =
+        {
+            .uri = "/setdata",
+            .method = HTTP_POST,
+            .handler = SetDataHandler,
+            .user_ctx = NULL};
+
     httpd_register_uri_handler(
         server,
         &root_uri);
@@ -273,6 +468,10 @@ esp_err_t StartWebServer(void)
     httpd_register_uri_handler(
         server,
         &upload_uri);
+
+    httpd_register_uri_handler(
+        server,
+        &setdata_uri);
 
     ESP_LOGI(
         TAG,

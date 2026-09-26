@@ -1,0 +1,20 @@
+services:
+  merge:
+    build: .
+    image: flight-radar-merge:latest
+    container_name: flight-radar-merge
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Holding the OpenSky credentials here means the ESP32 never needs them:
+      # point the device's data source at this service instead.
+      OPENSKY_CLIENT_ID: "${OPENSKY_CLIENT_ID:-}"
+      OPENSKY_CLIENT_SECRET: "${OPENSKY_CLIENT_SECRET:-}"
+      OPENSKY_EXTENDED: "${OPENSKY_EXTENDED:-false}"
+      ADSB_SOURCES: "${ADSB_SOURCES:-adsb.lol,adsb.fi}"
+      TAR1090_URL: "${TAR1090_URL:-}"
+      MAX_STATES: "${MAX_STATES:-150}"
+      CACHE_TTL_S: "${CACHE_TTL_S:-5}"
+      STALE_GRACE_S: "${STALE_GRACE_S:-120}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"

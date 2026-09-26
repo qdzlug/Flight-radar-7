@@ -6,6 +6,10 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+
 #include "nvs.h"
 #include "nvs_flash.h"
 
@@ -14,6 +18,9 @@
 #include "esp_crt_bundle.h"
 
 #define OPENSKY_NAMESPACE "opensky"
+#define RADAR_NAMESPACE "radar"
+
+static void LoadDataUrl(void);
 
 extern const uint8_t isrgrootx1_pem_start[] asm("_binary_isrgrootx1_pem_start");
 extern const uint8_t isrgrootx1_pem_end[] asm("_binary_isrgrootx1_pem_end");
@@ -105,12 +112,34 @@ bool OpenSky_ParseAircraft(
         cJSON *category =
             cJSON_GetArrayItem(state, 17);
 
+        cJSON *acType =
+            cJSON_GetArrayItem(state, 18);
+
+        cJSON *acReg =
+            cJSON_GetArrayItem(state, 19);
+
+        cJSON *baroAlt =
+            cJSON_GetArrayItem(state, 7);
+
+        cJSON *onGround =
+            cJSON_GetArrayItem(state, 8);
+
+        cJSON *vRate =
+            cJSON_GetArrayItem(state, 11);
+
         cJSON *country =
             cJSON_GetArrayItem(state, 2);
 
         if (!icao ||
             !lat ||
             !lon)
+        {
+            continue;
+        }
+
+        if (onGround &&
+            cJSON_IsBool(onGround) &&
+            cJSON_IsTrue(onGround))
         {
             continue;
         }
@@ -131,6 +160,24 @@ bool OpenSky_ParseAircraft(
         {
             a->category =
                 category->valueint;
+        }
+
+        if (acType &&
+            cJSON_IsString(acType))
+        {
+            strncpy(
+                a->type,
+                acType->valuestring,
+                sizeof(a->type) - 1);
+        }
+
+        if (acReg &&
+            cJSON_IsString(acReg))
+        {
+            strncpy(
+                a->reg,
+                acReg->valuestring,
+                sizeof(a->reg) - 1);
         }
 
         strncpy(
@@ -161,6 +208,11 @@ bool OpenSky_ParseAircraft(
 
         if (cJSON_IsNumber(alt))
             a->altitude = alt->valuedouble;
+        else if (cJSON_IsNumber(baroAlt))
+            a->altitude = baroAlt->valuedouble;
+
+        if (cJSON_IsNumber(vRate))
+            a->verticalRate = vRate->valuedouble;
 
         a->valid = true;
 
@@ -296,6 +348,13 @@ static bool RequestToken(void)
         esp_http_client_init(
             &config);
 
+    if (!client)
+    {
+        ESP_LOGE(TAG, "Client init failed (out of memory)");
+
+        return false;
+    }
+
     esp_http_client_set_method(
         client,
         HTTP_METHOD_POST);
@@ -392,40 +451,186 @@ bool OpenSky_Init(void)
 
     responseBuffer[0] = '\0';
 
+    LoadDataUrl();
+
     return LoadCredentials();
+}
+
+/*
+ * The data source URL is owned here so the poll task, the web task and the
+ * first-boot checks all read the same copy. It is guarded by a mutex because
+ * the web server can replace it while the radar is polling.
+ */
+static char dataUrl[128];
+static bool dataUrlLoaded = false;
+static SemaphoreHandle_t dataUrlMutex = NULL;
+
+static void DataUrlLock(void)
+{
+    if (!dataUrlMutex)
+    {
+        dataUrlMutex = xSemaphoreCreateMutex();
+    }
+
+    if (dataUrlMutex)
+    {
+        xSemaphoreTake(
+            dataUrlMutex,
+            portMAX_DELAY);
+    }
+}
+
+static void DataUrlUnlock(void)
+{
+    if (dataUrlMutex)
+    {
+        xSemaphoreGive(
+            dataUrlMutex);
+    }
+}
+
+static void LoadDataUrl(void)
+{
+    char stored[128];
+
+    nvs_handle_t handle;
+
+    stored[0] = '\0';
+
+    if (nvs_open(
+            RADAR_NAMESPACE,
+            NVS_READONLY,
+            &handle) == ESP_OK)
+    {
+        size_t len = sizeof(stored);
+
+        if (nvs_get_str(
+                handle,
+                "dataurl",
+                stored,
+                &len) != ESP_OK)
+        {
+            stored[0] = '\0';
+        }
+
+        nvs_close(handle);
+    }
+
+    DataUrlLock();
+
+    strncpy(
+        dataUrl,
+        stored,
+        sizeof(dataUrl) - 1);
+
+    dataUrl[sizeof(dataUrl) - 1] = '\0';
+
+    dataUrlLoaded = true;
+
+    DataUrlUnlock();
+}
+
+bool OpenSky_HasDataSource(void)
+{
+    /*
+     * Load on first use: the poll task is gated on this call, so waiting for
+     * OpenSky_Init would mean a device configured with only a data source
+     * never fetches anything.
+     */
+    DataUrlLock();
+
+    bool loaded = dataUrlLoaded;
+
+    DataUrlUnlock();
+
+    if (!loaded)
+    {
+        LoadDataUrl();
+    }
+
+    DataUrlLock();
+
+    bool configured = strlen(dataUrl) > 0;
+
+    DataUrlUnlock();
+
+    return configured;
+}
+
+bool OpenSky_SetDataUrl(
+    const char *url)
+{
+    nvs_handle_t handle;
+
+    if (!url)
+    {
+        return false;
+    }
+
+    if (nvs_open(
+            RADAR_NAMESPACE,
+            NVS_READWRITE,
+            &handle) != ESP_OK)
+    {
+        return false;
+    }
+
+    esp_err_t err =
+        nvs_set_str(
+            handle,
+            "dataurl",
+            url);
+
+    esp_err_t commitErr =
+        nvs_commit(handle);
+
+    nvs_close(handle);
+
+    if (err != ESP_OK ||
+        commitErr != ESP_OK)
+    {
+        return false;
+    }
+
+    DataUrlLock();
+
+    strncpy(
+        dataUrl,
+        url,
+        sizeof(dataUrl) - 1);
+
+    dataUrl[sizeof(dataUrl) - 1] = '\0';
+
+    dataUrlLoaded = true;
+
+    DataUrlUnlock();
+
+    ESP_LOGI(
+        TAG,
+        "Data source set to '%s'",
+        dataUrl);
+
+    return true;
 }
 
 bool OpenSky_HasCredentials(void)
 {
-
+    /* Never log the secret: the serial console is not a private channel. */
     ESP_LOGI(
         TAG,
-        "clientId='%s'",
-        clientId);
-
-    ESP_LOGI(
-        TAG,
-        "clientSecret='%s'",
-        clientSecret);
+        "OpenSky clientId present: %s",
+        strlen(clientId) > 0 ? "yes" : "no");
 
     return strlen(clientId) > 0 &&
            strlen(clientSecret) > 0;
 }
 
-bool OpenSky_GetAircraftJson(
-    float minLat,
-    float maxLat,
-    float minLon,
-    float maxLon,
+static bool FetchStates(
+    const char *url,
+    bool withAuth,
     char *buffer,
     size_t bufferSize)
 {
-    if (!EnsureToken())
-    {
-        ESP_LOGE(TAG, "Token unavailable");
-        return false;
-    }
-
     responseLength = 0;
     responseBuffer[0] = '\0';
 
@@ -437,63 +642,47 @@ bool OpenSky_GetAircraftJson(
         "Bearer %s",
         accessToken);
 
-    char url[512];
-
-    snprintf(
-        url,
-        sizeof(url),
-        "https://opensky-network.org/api/states/all?"
-        "lamin=%.6f&lamax=%.6f&"
-        "lomin=%.6f&lomax=%.6f",
-        minLat,
-        maxLat,
-        minLon,
-        maxLon);
-
     ESP_LOGI(TAG, "Request URL: %s", url);
 
     esp_http_client_config_t config =
         {
             .url = url,
             .event_handler = HttpEventHandler,
-            .transport_type = HTTP_TRANSPORT_OVER_SSL,
-            //.cert_pem = (const char *)isrgrootx1_pem_start,
-            .crt_bundle_attach = esp_crt_bundle_attach,
             .timeout_ms = 15000,
             .buffer_size = 8192,
             .buffer_size_tx = 4096,
         };
 
+    if (strncmp(url, "https://", 8) == 0)
+    {
+        config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+        config.crt_bundle_attach = esp_crt_bundle_attach;
+    }
+
     esp_http_client_handle_t client =
         esp_http_client_init(&config);
+
+    if (!client)
+    {
+        ESP_LOGE(TAG, "Client init failed (out of memory)");
+
+        return false;
+    }
 
     esp_http_client_set_method(
         client,
         HTTP_METHOD_GET);
 
-    esp_http_client_set_header(
-        client,
-        "Authorization",
-        bearer);
+    if (withAuth)
+    {
+        esp_http_client_set_header(
+            client,
+            "Authorization",
+            bearer);
+    }
 
     esp_err_t err =
         esp_http_client_perform(client);
-
-    /*
-ESP_LOGI(
-    TAG,
-    "perform=%s",
-    esp_err_to_name(err));
-
-ESP_LOGI(
-    TAG,
-    "status=%d",
-    esp_http_client_get_status_code(client));
-
-ESP_LOGI(TAG, "response=%s", responseBuffer);
-
-ESP_LOGI(TAG, "RequestToken start");
-*/
 
     if (err != ESP_OK)
     {
@@ -503,7 +692,6 @@ ESP_LOGI(TAG, "RequestToken start");
             esp_err_to_name(err));
 
         esp_http_client_cleanup(client);
-        ESP_LOGE(TAG, "Parse failed");
         return false;
     }
 
@@ -523,7 +711,6 @@ ESP_LOGI(TAG, "RequestToken start");
             TAG,
             "Unexpected HTTP status: %d",
             status);
-        ESP_LOGE(TAG, "Missing access_token");
         return false;
     }
 
@@ -535,4 +722,78 @@ ESP_LOGI(TAG, "RequestToken start");
     buffer[bufferSize - 1] = '\0';
 
     return true;
+}
+
+bool OpenSky_GetAircraftJson(
+    float minLat,
+    float maxLat,
+    float minLon,
+    float maxLon,
+    char *buffer,
+    size_t bufferSize)
+{
+    char url[512];
+    char source[128];
+
+    if (OpenSky_HasDataSource())
+    {
+        DataUrlLock();
+
+        strncpy(
+            source,
+            dataUrl,
+            sizeof(source) - 1);
+
+        source[sizeof(source) - 1] = '\0';
+
+        DataUrlUnlock();
+
+        if (strlen(source) > 0)
+        {
+            /*
+             * A saved URL that already carries a query string would end up
+             * with two '?' in a row, so append with '&' instead.
+             */
+            snprintf(
+                url,
+                sizeof(url),
+                "%s%slamin=%.6f&lamax=%.6f&"
+                "lomin=%.6f&lomax=%.6f",
+                source,
+                strchr(source, '?') ? "&" : "?",
+                minLat,
+                maxLat,
+                minLon,
+                maxLon);
+
+            if (FetchStates(url, false, buffer, bufferSize))
+            {
+                return true;
+            }
+
+            ESP_LOGW(
+                TAG,
+                "Data source '%s' failed, falling back to OpenSky",
+                source);
+        }
+    }
+
+    if (!EnsureToken())
+    {
+        ESP_LOGE(TAG, "Token unavailable");
+        return false;
+    }
+
+    snprintf(
+        url,
+        sizeof(url),
+        "https://opensky-network.org/api/states/all?"
+        "lamin=%.6f&lamax=%.6f&"
+        "lomin=%.6f&lomax=%.6f",
+        minLat,
+        maxLat,
+        minLon,
+        maxLon);
+
+    return FetchStates(url, true, buffer, bufferSize);
 }

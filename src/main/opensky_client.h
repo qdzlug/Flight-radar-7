@@ -11,6 +11,8 @@ typedef struct
     char icao24[12];
     char callsign[16];
     char originCountry[64];
+    char type[16];
+    char reg[16];
 
     int category;
 
@@ -20,6 +22,7 @@ typedef struct
     float altitude;
     float velocity;
     float heading;
+    float verticalRate;
 
     bool valid;
 
@@ -35,6 +38,8 @@ extern int gAircraftCount;
 
 bool OpenSky_Init(void);
 bool OpenSky_HasCredentials(void);
+bool OpenSky_HasDataSource(void);
+bool OpenSky_SetDataUrl(const char *url);
 
 bool OpenSky_GetAircraftJson(
     float minLat,

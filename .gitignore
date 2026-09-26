@@ -1,0 +1,22 @@
+# ESP-IDF build output
+src/build/
+src/managed_components/
+src/sdksupport/
+sdkconfig.old
+
+# Python (merge service)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Secrets and local overrides
+.env
+*.pem
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
