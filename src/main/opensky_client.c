@@ -118,6 +118,33 @@ bool OpenSky_ParseAircraft(
         cJSON *acReg =
             cJSON_GetArrayItem(state, 19);
 
+        cJSON *flightNumber =
+            cJSON_GetArrayItem(state, 20);
+
+        cJSON *departureAirport =
+            cJSON_GetArrayItem(state, 21);
+
+        cJSON *arrivalAirport =
+            cJSON_GetArrayItem(state, 22);
+
+        cJSON *flightStatus =
+            cJSON_GetArrayItem(state, 23);
+
+        cJSON *estimatedArrival =
+            cJSON_GetArrayItem(state, 24);
+
+        cJSON *airline =
+            cJSON_GetArrayItem(state, 25);
+
+        cJSON *enrichmentProvider =
+            cJSON_GetArrayItem(state, 26);
+
+        cJSON *enrichmentUpdatedAt =
+            cJSON_GetArrayItem(state, 27);
+
+        cJSON *enrichmentStale =
+            cJSON_GetArrayItem(state, 28);
+
         cJSON *baroAlt =
             cJSON_GetArrayItem(state, 7);
 
@@ -179,6 +206,33 @@ bool OpenSky_ParseAircraft(
                 acReg->valuestring,
                 sizeof(a->reg) - 1);
         }
+
+#define COPY_ENRICHMENT_TEXT(item, field)                     \
+    if ((item) && cJSON_IsString(item))                       \
+    {                                                         \
+        strncpy(a->field, (item)->valuestring, sizeof(a->field) - 1); \
+    }
+
+        COPY_ENRICHMENT_TEXT(flightNumber, flightNumber);
+        COPY_ENRICHMENT_TEXT(departureAirport, departureAirport);
+        COPY_ENRICHMENT_TEXT(arrivalAirport, arrivalAirport);
+        COPY_ENRICHMENT_TEXT(flightStatus, flightStatus);
+        COPY_ENRICHMENT_TEXT(airline, airline);
+        COPY_ENRICHMENT_TEXT(enrichmentProvider, enrichmentProvider);
+
+#undef COPY_ENRICHMENT_TEXT
+
+        if (estimatedArrival && cJSON_IsNumber(estimatedArrival))
+        {
+            a->estimatedArrival = (uint32_t)estimatedArrival->valuedouble;
+        }
+
+        if (enrichmentUpdatedAt && cJSON_IsNumber(enrichmentUpdatedAt))
+        {
+            a->enrichmentUpdatedAt = (uint32_t)enrichmentUpdatedAt->valuedouble;
+        }
+
+        a->enrichmentStale = enrichmentStale && cJSON_IsTrue(enrichmentStale);
 
         strncpy(
             a->icao24,

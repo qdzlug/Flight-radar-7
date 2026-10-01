@@ -17,6 +17,7 @@
 #include "nvs_flash.h"
 #include "esp_netif.h"
 #include <math.h>
+#include <time.h>
 
 #include "esp_sntp.h"
 
@@ -245,9 +246,43 @@ void UpdateSelectedAircraftUI(void)
             a->callsign);
     }
 
-    lv_label_set_text(
-        uic_LabelCraftOrigin,
-        a->originCountry);
+    if (a->departureAirport[0] != '\0' ||
+        a->arrivalAirport[0] != '\0')
+    {
+        const char *departure =
+            a->departureAirport[0] != '\0' ? a->departureAirport : "---";
+        const char *arrival =
+            a->arrivalAirport[0] != '\0' ? a->arrivalAirport : "---";
+
+        lv_label_set_text_fmt(
+            uic_LabelCraftOrigin,
+            "%s > %s",
+            departure,
+            arrival);
+
+        if (a->estimatedArrival > 0)
+        {
+            time_t eta = (time_t)a->estimatedArrival;
+            struct tm etaUtc;
+            gmtime_r(&eta, &etaUtc);
+            lv_label_set_text_fmt(
+                ui_Label20,
+                "Route ETA %02d:%02dZ",
+                etaUtc.tm_hour,
+                etaUtc.tm_min);
+        }
+        else
+        {
+            lv_label_set_text(ui_Label20, "Route");
+        }
+    }
+    else
+    {
+        lv_label_set_text(ui_Label20, "Origin");
+        lv_label_set_text(
+            uic_LabelCraftOrigin,
+            a->originCountry);
+    }
 
     char buf[64];
 
@@ -281,10 +316,23 @@ void UpdateSelectedAircraftUI(void)
         uic_LabelCraftHeading,
         buf);
 
-    lv_label_set_text(
-        uic_LabelCraftCategory,
-        GetCategoryName(
-            a->category));
+    if (a->flightStatus[0] != '\0')
+    {
+        lv_label_set_text(
+            ui_Label25,
+            a->enrichmentStale ? "Status (cached)" : "Status");
+        lv_label_set_text(
+            uic_LabelCraftCategory,
+            a->flightStatus);
+    }
+    else
+    {
+        lv_label_set_text(ui_Label25, "Category");
+        lv_label_set_text(
+            uic_LabelCraftCategory,
+            GetCategoryName(
+                a->category));
+    }
 }
 
 void setUICoords()

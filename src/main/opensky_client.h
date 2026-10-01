@@ -13,6 +13,16 @@ typedef struct
     char originCountry[64];
     char type[16];
     char reg[16];
+    char flightNumber[16];
+    char departureAirport[8];
+    char arrivalAirport[8];
+    char flightStatus[24];
+    char airline[40];
+    char enrichmentProvider[16];
+
+    uint32_t estimatedArrival;
+    uint32_t enrichmentUpdatedAt;
+    bool enrichmentStale;
 
     int category;
 
