@@ -28,7 +28,28 @@ extern lv_obj_t * ui_ContainerLabels;
 extern lv_obj_t * ui_LabelShowLabels;
 extern void ui_event_Switch3(lv_event_t * e);
 extern lv_obj_t * ui_Switch3;
+extern lv_obj_t * ui_LabelSettingsTitle;
+extern lv_obj_t * ui_LabelRadarSettings;
+extern lv_obj_t * ui_ContainerRadarFields;
+extern void ui_event_TextLat(lv_event_t * e);
+extern lv_obj_t * ui_TextLat;
+extern void ui_event_TextLon(lv_event_t * e);
+extern lv_obj_t * ui_TextLon;
+extern void ui_event_TextRange(lv_event_t * e);
+extern lv_obj_t * ui_TextRange;
+extern void ui_event_TextPoll(lv_event_t * e);
+extern lv_obj_t * ui_TextPoll;
+extern void ui_event_ButtonSaveRadar(lv_event_t * e);
+extern lv_obj_t * ui_ButtonSaveRadar;
+extern lv_obj_t * ui_LabelSaveRadar;
+extern lv_obj_t * ui_ContainerActions;
+extern lv_obj_t * ui_KeyboardSettings;
 // CUSTOM VARIABLES
+extern lv_obj_t * uic_TextLat;
+extern lv_obj_t * uic_TextLon;
+extern lv_obj_t * uic_TextRange;
+extern lv_obj_t * uic_TextPoll;
+extern lv_obj_t * uic_KeyboardCoord;
 
 #ifdef __cplusplus
 } /*extern "C"*/

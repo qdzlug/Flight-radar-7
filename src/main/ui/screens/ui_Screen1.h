@@ -58,8 +58,6 @@ extern lv_obj_t * ui_Container2;
 extern lv_obj_t * ui_LabelIP;
 extern lv_obj_t * ui_LabelIPData;
 extern lv_obj_t * ui_LabelCoords;
-extern void ui_event_Button3(lv_event_t * e);
-extern lv_obj_t * ui_Button3;
 extern lv_obj_t * ui_LabelPlaneCount;
 extern lv_obj_t * ui_LabelAPIRefresh;
 extern lv_obj_t * ui_ContainerSep1;
@@ -68,26 +66,6 @@ extern lv_obj_t * ui_ContainerSep3;
 extern lv_obj_t * ui_DialogConfigReq;
 extern lv_obj_t * ui_Label3;
 extern lv_obj_t * ui_Label5;
-extern lv_obj_t * ui_DialogCoord;
-extern lv_obj_t * ui_Container10;
-extern lv_obj_t * ui_Label16;
-extern lv_obj_t * ui_Container9;
-extern void ui_event_TextLat(lv_event_t * e);
-extern lv_obj_t * ui_TextLat;
-extern void ui_event_TextLon(lv_event_t * e);
-extern lv_obj_t * ui_TextLon;
-extern void ui_event_TextRange(lv_event_t * e);
-extern lv_obj_t * ui_TextRange;
-extern void ui_event_TextPoll(lv_event_t * e);
-extern lv_obj_t * ui_TextPoll;
-extern lv_obj_t * ui_Container7;
-extern void ui_event_Button5(lv_event_t * e);
-extern lv_obj_t * ui_Button5;
-extern lv_obj_t * ui_Label27;
-extern void ui_event_Button7(lv_event_t * e);
-extern lv_obj_t * ui_Button7;
-extern lv_obj_t * ui_Label28;
-extern lv_obj_t * ui_KeyboardCoord;
 // CUSTOM VARIABLES
 extern lv_obj_t * uic_PanelRight;
 extern lv_obj_t * uic_LabelCraftName;
@@ -110,12 +88,6 @@ extern lv_obj_t * uic_LabelCoords;
 extern lv_obj_t * uic_LabelPlaneCount;
 extern lv_obj_t * uic_LabelAPIRefresh;
 extern lv_obj_t * uic_DialogConfigReq;
-extern lv_obj_t * uic_DialogCoord;
-extern lv_obj_t * uic_TextLat;
-extern lv_obj_t * uic_TextLon;
-extern lv_obj_t * uic_TextRange;
-extern lv_obj_t * uic_TextPoll;
-extern lv_obj_t * uic_KeyboardCoord;
 
 #ifdef __cplusplus
 } /*extern "C"*/
