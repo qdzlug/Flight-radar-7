@@ -160,6 +160,7 @@ subscription is purchased. Feeder/Contributor access alone is insufficient.
   original cards when enrichment is absent.
 - Section 6 includes environment documentation, health counters, a persistent
   Docker volume and local-only defaults.
-- Live FlightAware validation is pending an API key and must be completed
-  before enrichment is enabled in production.
+- Live FlightAware validation completed on 2026-10-01 with a one-request
+  budget: the first response fell back to base data and a later response used
+  the cached route/status enrichment. Production enablement remains explicit.
 - The optional Flightradar24 adapter remains deferred.

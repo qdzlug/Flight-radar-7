@@ -16,6 +16,8 @@ server/data/
 # Secrets and local overrides
 .env
 *.pem
+.flightaware-api
+.flightawareapi
 
 # Editor / OS
 .DS_Store
