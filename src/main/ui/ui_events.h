@@ -14,6 +14,7 @@ void wifi_connect_btn_cb(lv_event_t * e);
 void toggleLabels(lv_event_t * e);
 void Radar_SelectPrev(lv_event_t * e);
 void Radar_SelectNext(lv_event_t * e);
+void showRadarSettings(lv_event_t * e);
 void editCoords(lv_event_t * e);
 void forgetWifi(lv_event_t * e);
 void forgetAPI(lv_event_t * e);

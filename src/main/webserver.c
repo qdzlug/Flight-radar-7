@@ -129,7 +129,14 @@ static esp_err_t SetDataHandler(
         return ESP_FAIL;
     }
 
-    const char *url = dataUrl->valuestring;
+    char url[128];
+
+    strncpy(
+        url,
+        dataUrl->valuestring,
+        sizeof(url) - 1);
+
+    url[sizeof(url) - 1] = '\0';
 
     ESP_LOGI(
         TAG,

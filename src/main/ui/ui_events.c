@@ -167,6 +167,20 @@ void Radar_SelectNext(lv_event_t *e)
 	UpdateSelectedAircraftUI();
 }
 
+void showRadarSettings(lv_event_t *e)
+{
+	char value[24];
+
+	lv_snprintf(value, sizeof(value), "%.4f", GetRadarLat());
+	lv_textarea_set_text(uic_TextLat, value);
+	lv_snprintf(value, sizeof(value), "%.4f", GetRadarLon());
+	lv_textarea_set_text(uic_TextLon, value);
+	lv_snprintf(value, sizeof(value), "%.0f", GetRadarRange());
+	lv_textarea_set_text(uic_TextRange, value);
+	lv_snprintf(value, sizeof(value), "%.0f", GetRadarPoll());
+	lv_textarea_set_text(uic_TextPoll, value);
+}
+
 void editCoords(lv_event_t *e)
 {
 	float lat =
@@ -179,17 +193,21 @@ void editCoords(lv_event_t *e)
 			lv_textarea_get_text(
 				uic_TextLon));
 
-	/*
-float rangeKm =
-atof(
-lv_textarea_get_text(
-	uic_TextRange));
-*/
+	float rangeKm =
+		atof(
+			lv_textarea_get_text(
+				uic_TextRange));
+
+	float pollSeconds =
+		atof(
+			lv_textarea_get_text(
+				uic_TextPoll));
 
 	SetRadarSettings(
 		lat,
 		lon,
-		100.0f);
+		rangeKm,
+		pollSeconds);
 
 	Radar_Refresh();
 }

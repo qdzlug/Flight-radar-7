@@ -34,6 +34,7 @@
 static float radarLat = 13.1993f;
 static float radarLon = 77.7067f;
 static float radarRangeKm = 100.0f;
+static float radarPollSeconds = 25.0f;
 
 // #define I2C_MASTER_NUM              I2C_NUM_0
 #define I2C_MASTER_SDA_IO 15
@@ -80,7 +81,8 @@ esp_err_t http_event_handler(
 void SaveRadarSettings(
     float lat,
     float lon,
-    float rangeKm)
+    float rangeKm,
+    float pollSeconds)
 {
     nvs_handle_t handle;
 
@@ -107,12 +109,19 @@ void SaveRadarSettings(
             &rangeKm,
             sizeof(rangeKm));
 
+        nvs_set_blob(
+            handle,
+            "poll",
+            &pollSeconds,
+            sizeof(pollSeconds));
+
         ESP_LOGW(
             "RADAR",
-            "Saving %.4f %.4f %.1f",
+            "Saving %.4f %.4f %.1f km, poll %.1f s",
             lat,
             lon,
-            rangeKm);
+            rangeKm,
+            pollSeconds);
 
         esp_err_t err = nvs_commit(handle);
 
@@ -161,6 +170,11 @@ static const char *GetCategoryName(
 
 void UpdateSelectedAircraftUI(void)
 {
+    lv_label_set_text_fmt(
+        uic_LabelPlaneCount,
+        "Planes: %d",
+        gAircraftCount);
+
     Aircraft *a =
         Radar_GetSelectedAircraft();
 
@@ -169,14 +183,20 @@ void UpdateSelectedAircraftUI(void)
         return;
     }
 
-    lv_label_set_text_fmt(
-        uic_LabelPlaneCount,
-        "%d",
-        gAircraftCount);
-
-    lv_label_set_text(
-        uic_LabelCraftName,
-        a->callsign);
+    if (a->type[0] != '\0')
+    {
+        lv_label_set_text_fmt(
+            uic_LabelCraftName,
+            "%s %s",
+            a->callsign,
+            a->type);
+    }
+    else
+    {
+        lv_label_set_text(
+            uic_LabelCraftName,
+            a->callsign);
+    }
 
     lv_label_set_text(
         uic_LabelCraftOrigin,
@@ -231,7 +251,7 @@ void setUICoords()
         snprintf(
             buf,
             sizeof(buf),
-            "%.4f\n%.4f",
+            "%.4f, %.4f",
             (double)radarLat,
             (double)radarLon);
 
@@ -251,7 +271,8 @@ void setUICoords()
 bool LoadRadarSettings(
     float *lat,
     float *lon,
-    float *rangeKm)
+    float *rangeKm,
+    float *pollSeconds)
 {
     nvs_handle_t handle;
 
@@ -293,7 +314,25 @@ bool LoadRadarSettings(
             rangeKm,
             &len);
 
-    ESP_LOGW("RADAR", "Loaded radar settings: lat=%.4f, lon=%.4f, range=%.2f km", *lat, *lon, *rangeKm);
+    len = sizeof(float);
+
+    esp_err_t e4 =
+        nvs_get_blob(
+            handle,
+            "poll",
+            pollSeconds,
+            &len);
+
+    if (e4 != ESP_OK)
+    {
+        *pollSeconds = 25.0f;
+    }
+
+    *rangeKm = fminf(200.0f, fmaxf(5.0f, *rangeKm));
+    *pollSeconds = fminf(120.0f, fmaxf(10.0f, *pollSeconds));
+
+    ESP_LOGW("RADAR", "Loaded radar settings: lat=%.4f, lon=%.4f, range=%.2f km, poll=%.1f s",
+             *lat, *lon, *rangeKm, *pollSeconds);
 
     nvs_close(handle);
 
@@ -317,19 +356,27 @@ float GetRadarRange(void)
     return radarRangeKm;
 }
 
+float GetRadarPoll(void)
+{
+    return radarPollSeconds;
+}
+
 void SetRadarSettings(
     float lat,
     float lon,
-    float rangeKm)
+    float rangeKm,
+    float pollSeconds)
 {
     radarLat = lat;
     radarLon = lon;
-    radarRangeKm = rangeKm;
+    radarRangeKm = fminf(200.0f, fmaxf(5.0f, rangeKm));
+    radarPollSeconds = fminf(120.0f, fmaxf(10.0f, pollSeconds));
 
     SaveRadarSettings(
         radarLat,
         radarLon,
-        radarRangeKm);
+        radarRangeKm,
+        radarPollSeconds);
 
     Radar_SetCenter(
         radarLat,
@@ -497,7 +544,7 @@ static void wifi_event_handler(
             "IP: %s",
             ipStr);
 
-        if (OpenSky_HasCredentials())
+        if (OpenSky_HasCredentials() || OpenSky_HasDataSource())
             lv_obj_add_flag(uic_DialogConfigReq, LV_OBJ_FLAG_HIDDEN);
 
         InitTime();
@@ -760,6 +807,21 @@ esp_err_t i2c_write_byte(uint8_t device_addr, uint8_t data)
     return ret;
 }
 
+/* TEMP DIAGNOSTIC - remove after debugging GT911 init failure */
+static void i2c_bus_scan(const char *when)
+{
+    ESP_LOGW("I2CSCAN", "--- bus scan (%s) sda=%d scl=%d port=%d ---",
+             when, I2C_MASTER_SDA_IO, I2C_MASTER_SCL_IO, I2C_MASTER_NUM);
+    int found = 0;
+    for (uint8_t addr = 0x08; addr < 0x78; addr++) {
+        if (i2c_scan_address(addr)) {
+            ESP_LOGW("I2CSCAN", "    ACK at 0x%02X", addr);
+            found++;
+        }
+    }
+    ESP_LOGW("I2CSCAN", "--- %d device(s) responded ---", found);
+}
+
 static void ui_status_timer_cb(lv_timer_t *t)
 {
     if (wifiConnectedEvent)
@@ -819,10 +881,7 @@ static void ui_status_timer_cb(lv_timer_t *t)
                 "Has creds: %d",
                 OpenSky_HasCredentials());
 
-            if (!OpenSky_HasCredentials())
-            {
-                StartWebServer();
-            }
+            StartWebServer();
         }
         else
         {
@@ -845,7 +904,7 @@ static void radar_update_timer_cb(void *pvParameters)
     while (1)
     {
         if (wifiConnectedState &&
-            OpenSky_HasCredentials())
+            (OpenSky_HasCredentials() || OpenSky_HasDataSource()))
         {
             float centerLat = radarLat;
             float centerLon = radarLon;
@@ -888,15 +947,15 @@ static void radar_update_timer_cb(void *pvParameters)
 
                 if (lvgl_port_lock(0))
                 {
-                    UpdateSelectedAircraftUI();
                     Radar_ReconcileSelection();
+                    UpdateSelectedAircraftUI();
 
                     Radar_Refresh();
                     lvgl_port_unlock();
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(15000));
+        vTaskDelay(pdMS_TO_TICKS((uint32_t)(radarPollSeconds * 1000.0f)));
     }
 }
 
@@ -919,7 +978,7 @@ static void RadarPredictTask(
             Radar_Refresh();
             lv_label_set_text_fmt(
                 uic_LabelAPIRefresh,
-                "%lus ago",
+                "Ref: %lus",
                 ageSec);
             lvgl_port_unlock();
         }
@@ -936,8 +995,15 @@ void app_main()
     i2c_master_init();
     vTaskDelay(pdMS_TO_TICKS(50));
 
+    /* TEMP DIAGNOSTIC - remove after debugging GT911 init failure */
+    i2c_bus_scan("before expander writes");
+
     i2c_write_byte(0x30, 0x18);
     i2c_write_byte(0x30, 0x10);
+
+    /* TEMP DIAGNOSTIC - remove after debugging GT911 init failure */
+    vTaskDelay(pdMS_TO_TICKS(100));
+    i2c_bus_scan("after expander writes");
 
     gpio_reset_pin(LCD_BL_PIN);
     gpio_set_direction(LCD_BL_PIN, GPIO_MODE_OUTPUT);
@@ -985,11 +1051,13 @@ void app_main()
     if (!LoadRadarSettings(
             &radarLat,
             &radarLon,
-            &radarRangeKm))
+            &radarRangeKm,
+            &radarPollSeconds))
     {
         radarLat = 13.1993f;
         radarLon = 77.7067f;
         radarRangeKm = 100.0f;
+        radarPollSeconds = 25.0f;
     }
 
     Radar_SetCenter(

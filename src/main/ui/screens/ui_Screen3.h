@@ -24,6 +24,10 @@ extern lv_obj_t * ui_Label9;
 extern void ui_event_Button9(lv_event_t * e);
 extern lv_obj_t * ui_Button9;
 extern lv_obj_t * ui_Label10;
+extern lv_obj_t * ui_ContainerLabels;
+extern lv_obj_t * ui_LabelShowLabels;
+extern void ui_event_Switch3(lv_event_t * e);
+extern lv_obj_t * ui_Switch3;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus
@@ -31,4 +35,3 @@ extern lv_obj_t * ui_Label10;
 #endif
 
 #endif
-
