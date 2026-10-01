@@ -100,6 +100,7 @@ extern lv_obj_t * uic_PanelRadar;
 extern lv_obj_t * uic_Imageradar;
 extern lv_obj_t * uic_ButtonLeft;
 extern lv_obj_t * uic_ButtonRight;
+extern lv_obj_t * uic_LabelRange;
 extern lv_obj_t * uic_PanelBottom;
 extern lv_obj_t * uic_LabelConnection;
 extern lv_obj_t * uic_LabelWifiName;

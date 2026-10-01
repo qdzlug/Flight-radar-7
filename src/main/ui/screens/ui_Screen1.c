@@ -19,6 +19,7 @@ lv_obj_t * uic_LabelConnection;
 lv_obj_t * uic_PanelBottom;
 lv_obj_t * uic_ButtonRight;
 lv_obj_t * uic_ButtonLeft;
+lv_obj_t * uic_LabelRange;
 lv_obj_t * uic_Imageradar;
 lv_obj_t * uic_PanelRadar;
 lv_obj_t * uic_LabelCraftHeading;
@@ -538,7 +539,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label29, 0);
     lv_obj_set_y(ui_Label29, 20);
     lv_obj_set_align(ui_Label29, LV_ALIGN_BOTTOM_MID);
-    lv_label_set_text(ui_Label29, "< 100 km >");
+    lv_label_set_text(ui_Label29, "Range: 100 km");
 
     ui_PanelBottom = lv_obj_create(ui_Screen1);
     lv_obj_set_height(ui_PanelBottom, 50);
@@ -727,7 +728,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_width(ui_Label16, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Label16, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_align(ui_Label16, LV_ALIGN_TOP_MID);
-    lv_label_set_text(ui_Label16, "Edit co-ordinates");
+    lv_label_set_text(ui_Label16, "Radar settings");
     lv_obj_set_style_text_font(ui_Label16, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_Container9 = lv_obj_create(ui_Container10);
@@ -836,6 +837,7 @@ void ui_Screen1_screen_init(void)
     uic_Imageradar = ui_Imageradar;
     uic_ButtonLeft = ui_ButtonLeft;
     uic_ButtonRight = ui_ButtonRight;
+    uic_LabelRange = ui_Label29;
     uic_PanelBottom = ui_PanelBottom;
     uic_LabelConnection = ui_Label2;
     uic_LabelWifiName = ui_LabelWifiName;
@@ -901,6 +903,7 @@ void ui_Screen1_screen_destroy(void)
     ui_Label7 = NULL;
     uic_ButtonRight = NULL;
     ui_ButtonRight = NULL;
+    uic_LabelRange = NULL;
     ui_Label11 = NULL;
     ui_Label29 = NULL;
     uic_PanelBottom = NULL;

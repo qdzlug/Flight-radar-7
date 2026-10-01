@@ -259,6 +259,16 @@ void setUICoords()
             uic_LabelCoords,
             buf);
 
+        snprintf(
+            buf,
+            sizeof(buf),
+            "Range: %.0f km",
+            (double)radarRangeKm);
+
+        lv_label_set_text(
+            uic_LabelRange,
+            buf);
+
         ESP_LOGW("RADAR", "Radar settings updated in UI");
         lvgl_port_unlock();
     }
@@ -1041,9 +1051,9 @@ void app_main()
             NULL);
 
         Radar_SetCenter(
-            12.9716f,
-            77.5946f,
-            100.0f);
+            radarLat,
+            radarLon,
+            radarRangeKm);
 
         lvgl_port_unlock();
     }
