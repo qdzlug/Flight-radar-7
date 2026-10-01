@@ -23,6 +23,7 @@ lv_obj_t * ui_TextLat = NULL;
 lv_obj_t * ui_TextLon = NULL;
 lv_obj_t * ui_TextRange = NULL;
 lv_obj_t * ui_TextPoll = NULL;
+lv_obj_t * ui_TextCycle = NULL;
 lv_obj_t * ui_ButtonSaveRadar = NULL;
 lv_obj_t * ui_LabelSaveRadar = NULL;
 lv_obj_t * ui_ContainerActions = NULL;
@@ -31,6 +32,7 @@ lv_obj_t * uic_TextLat;
 lv_obj_t * uic_TextLon;
 lv_obj_t * uic_TextRange;
 lv_obj_t * uic_TextPoll;
+lv_obj_t * uic_TextCycle;
 lv_obj_t * uic_KeyboardCoord;
 // event funtions
 void ui_event_Button4(lv_event_t * e)
@@ -94,6 +96,13 @@ void ui_event_TextPoll(lv_event_t * e)
 {
     if(lv_event_get_code(e) == LV_EVENT_CLICKED) {
         _ui_keyboard_set_target(ui_KeyboardSettings, ui_TextPoll);
+    }
+}
+
+void ui_event_TextCycle(lv_event_t * e)
+{
+    if(lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        _ui_keyboard_set_target(ui_KeyboardSettings, ui_TextCycle);
     }
 }
 
@@ -161,7 +170,7 @@ void ui_Screen3_screen_init(void)
     ui_ContainerRadarFields = lv_obj_create(ui_Container8);
     lv_obj_remove_style_all(ui_ContainerRadarFields);
     lv_obj_set_width(ui_ContainerRadarFields, 360);
-    lv_obj_set_height(ui_ContainerRadarFields, 110);
+    lv_obj_set_height(ui_ContainerRadarFields, 160);
     lv_obj_set_flex_flow(ui_ContainerRadarFields, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_set_flex_align(ui_ContainerRadarFields, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_SPACE_EVENLY,
                           LV_FLEX_ALIGN_CENTER);
@@ -194,6 +203,13 @@ void ui_Screen3_screen_init(void)
     lv_textarea_set_placeholder_text(ui_TextPoll, "Poll: 10-120 sec");
     lv_textarea_set_one_line(ui_TextPoll, true);
     lv_textarea_set_accepted_chars(ui_TextPoll, "0123456789.");
+
+    ui_TextCycle = lv_textarea_create(ui_ContainerRadarFields);
+    lv_obj_set_width(ui_TextCycle, 170);
+    lv_obj_set_height(ui_TextCycle, 45);
+    lv_textarea_set_placeholder_text(ui_TextCycle, "Cycle: 0=off, 2-120 sec");
+    lv_textarea_set_one_line(ui_TextCycle, true);
+    lv_textarea_set_accepted_chars(ui_TextCycle, "0123456789.");
 
     ui_ButtonSaveRadar = lv_btn_create(ui_Container8);
     lv_obj_set_width(ui_ButtonSaveRadar, 160);
@@ -278,6 +294,7 @@ void ui_Screen3_screen_init(void)
     lv_obj_add_event_cb(ui_TextLon, ui_event_TextLon, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_TextRange, ui_event_TextRange, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_TextPoll, ui_event_TextPoll, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_TextCycle, ui_event_TextCycle, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonSaveRadar, ui_event_ButtonSaveRadar, LV_EVENT_ALL, NULL);
     lv_keyboard_set_textarea(ui_KeyboardSettings, ui_TextLat);
 
@@ -285,6 +302,7 @@ void ui_Screen3_screen_init(void)
     uic_TextLon = ui_TextLon;
     uic_TextRange = ui_TextRange;
     uic_TextPoll = ui_TextPoll;
+    uic_TextCycle = ui_TextCycle;
     uic_KeyboardCoord = ui_KeyboardSettings;
 
 }
@@ -316,6 +334,8 @@ void ui_Screen3_screen_destroy(void)
     ui_TextRange = NULL;
     uic_TextPoll = NULL;
     ui_TextPoll = NULL;
+    uic_TextCycle = NULL;
+    ui_TextCycle = NULL;
     ui_ButtonSaveRadar = NULL;
     ui_LabelSaveRadar = NULL;
     ui_ContainerActions = NULL;

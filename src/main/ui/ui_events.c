@@ -142,6 +142,7 @@ void Radar_SelectPrev(lv_event_t *e)
 
 	Radar_Refresh();
 	UpdateSelectedAircraftUI();
+	ResetAircraftCycleTimer();
 }
 
 void Radar_SelectNext(lv_event_t *e)
@@ -165,6 +166,7 @@ void Radar_SelectNext(lv_event_t *e)
 
 	Radar_Refresh();
 	UpdateSelectedAircraftUI();
+	ResetAircraftCycleTimer();
 }
 
 void showRadarSettings(lv_event_t *e)
@@ -179,6 +181,8 @@ void showRadarSettings(lv_event_t *e)
 	lv_textarea_set_text(uic_TextRange, value);
 	lv_snprintf(value, sizeof(value), "%.0f", GetRadarPoll());
 	lv_textarea_set_text(uic_TextPoll, value);
+	lv_snprintf(value, sizeof(value), "%.0f", GetAircraftCycle());
+	lv_textarea_set_text(uic_TextCycle, value);
 }
 
 void editCoords(lv_event_t *e)
@@ -203,11 +207,17 @@ void editCoords(lv_event_t *e)
 			lv_textarea_get_text(
 				uic_TextPoll));
 
+	float cycleSeconds =
+		atof(
+			lv_textarea_get_text(
+				uic_TextCycle));
+
 	SetRadarSettings(
 		lat,
 		lon,
 		rangeKm,
-		pollSeconds);
+		pollSeconds,
+		cycleSeconds);
 
 	Radar_Refresh();
 }

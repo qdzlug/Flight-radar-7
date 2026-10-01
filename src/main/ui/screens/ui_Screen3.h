@@ -39,6 +39,8 @@ extern void ui_event_TextRange(lv_event_t * e);
 extern lv_obj_t * ui_TextRange;
 extern void ui_event_TextPoll(lv_event_t * e);
 extern lv_obj_t * ui_TextPoll;
+extern void ui_event_TextCycle(lv_event_t * e);
+extern lv_obj_t * ui_TextCycle;
 extern void ui_event_ButtonSaveRadar(lv_event_t * e);
 extern lv_obj_t * ui_ButtonSaveRadar;
 extern lv_obj_t * ui_LabelSaveRadar;
@@ -49,6 +51,7 @@ extern lv_obj_t * uic_TextLat;
 extern lv_obj_t * uic_TextLon;
 extern lv_obj_t * uic_TextRange;
 extern lv_obj_t * uic_TextPoll;
+extern lv_obj_t * uic_TextCycle;
 extern lv_obj_t * uic_KeyboardCoord;
 
 #ifdef __cplusplus

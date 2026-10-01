@@ -35,6 +35,8 @@ static float radarLat = 13.1993f;
 static float radarLon = 77.7067f;
 static float radarRangeKm = 100.0f;
 static float radarPollSeconds = 25.0f;
+static float aircraftCycleSeconds = 0.0f;
+static uint32_t lastAircraftCycleMs = 0;
 
 // #define I2C_MASTER_NUM              I2C_NUM_0
 #define I2C_MASTER_SDA_IO 15
@@ -56,6 +58,43 @@ static void radar_sweep_timer_cb(
     lv_timer_t *t)
 {
     Radar_SweepTick();
+}
+
+void ResetAircraftCycleTimer(void)
+{
+    lastAircraftCycleMs =
+        xTaskGetTickCount() * portTICK_PERIOD_MS;
+}
+
+static void aircraft_cycle_timer_cb(
+    lv_timer_t *t)
+{
+    if (aircraftCycleSeconds <= 0.0f ||
+        gAircraftCount < 2)
+    {
+        ResetAircraftCycleTimer();
+        return;
+    }
+
+    uint32_t now =
+        xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+    if (now - lastAircraftCycleMs >=
+        (uint32_t)(aircraftCycleSeconds * 1000.0f))
+    {
+        Radar_SelectNext(NULL);
+    }
+}
+
+static float ClampAircraftCycleSeconds(
+    float seconds)
+{
+    if (seconds <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    return fminf(120.0f, fmaxf(2.0f, seconds));
 }
 
 typedef struct
@@ -82,7 +121,8 @@ void SaveRadarSettings(
     float lat,
     float lon,
     float rangeKm,
-    float pollSeconds)
+    float pollSeconds,
+    float cycleSeconds)
 {
     nvs_handle_t handle;
 
@@ -115,13 +155,20 @@ void SaveRadarSettings(
             &pollSeconds,
             sizeof(pollSeconds));
 
+        nvs_set_blob(
+            handle,
+            "cycle",
+            &cycleSeconds,
+            sizeof(cycleSeconds));
+
         ESP_LOGW(
             "RADAR",
-            "Saving %.4f %.4f %.1f km, poll %.1f s",
+            "Saving %.4f %.4f %.1f km, poll %.1f s, cycle %.1f s",
             lat,
             lon,
             rangeKm,
-            pollSeconds);
+            pollSeconds,
+            cycleSeconds);
 
         esp_err_t err = nvs_commit(handle);
 
@@ -282,7 +329,8 @@ bool LoadRadarSettings(
     float *lat,
     float *lon,
     float *rangeKm,
-    float *pollSeconds)
+    float *pollSeconds,
+    float *cycleSeconds)
 {
     nvs_handle_t handle;
 
@@ -338,11 +386,26 @@ bool LoadRadarSettings(
         *pollSeconds = 25.0f;
     }
 
+    len = sizeof(float);
+
+    esp_err_t e5 =
+        nvs_get_blob(
+            handle,
+            "cycle",
+            cycleSeconds,
+            &len);
+
+    if (e5 != ESP_OK)
+    {
+        *cycleSeconds = 0.0f;
+    }
+
     *rangeKm = fminf(200.0f, fmaxf(5.0f, *rangeKm));
     *pollSeconds = fminf(120.0f, fmaxf(10.0f, *pollSeconds));
+    *cycleSeconds = ClampAircraftCycleSeconds(*cycleSeconds);
 
-    ESP_LOGW("RADAR", "Loaded radar settings: lat=%.4f, lon=%.4f, range=%.2f km, poll=%.1f s",
-             *lat, *lon, *rangeKm, *pollSeconds);
+    ESP_LOGW("RADAR", "Loaded radar settings: lat=%.4f, lon=%.4f, range=%.2f km, poll=%.1f s, cycle=%.1f s",
+             *lat, *lon, *rangeKm, *pollSeconds, *cycleSeconds);
 
     nvs_close(handle);
 
@@ -371,22 +434,32 @@ float GetRadarPoll(void)
     return radarPollSeconds;
 }
 
+float GetAircraftCycle(void)
+{
+    return aircraftCycleSeconds;
+}
+
 void SetRadarSettings(
     float lat,
     float lon,
     float rangeKm,
-    float pollSeconds)
+    float pollSeconds,
+    float cycleSeconds)
 {
     radarLat = lat;
     radarLon = lon;
     radarRangeKm = fminf(200.0f, fmaxf(5.0f, rangeKm));
     radarPollSeconds = fminf(120.0f, fmaxf(10.0f, pollSeconds));
+    aircraftCycleSeconds = ClampAircraftCycleSeconds(cycleSeconds);
 
     SaveRadarSettings(
         radarLat,
         radarLon,
         radarRangeKm,
-        radarPollSeconds);
+        radarPollSeconds,
+        aircraftCycleSeconds);
+
+    ResetAircraftCycleTimer();
 
     Radar_SetCenter(
         radarLat,
@@ -1050,6 +1123,11 @@ void app_main()
             30,
             NULL);
 
+        lv_timer_create(
+            aircraft_cycle_timer_cb,
+            250,
+            NULL);
+
         Radar_SetCenter(
             radarLat,
             radarLon,
@@ -1062,13 +1140,17 @@ void app_main()
             &radarLat,
             &radarLon,
             &radarRangeKm,
-            &radarPollSeconds))
+            &radarPollSeconds,
+            &aircraftCycleSeconds))
     {
         radarLat = 13.1993f;
         radarLon = 77.7067f;
         radarRangeKm = 100.0f;
         radarPollSeconds = 25.0f;
+        aircraftCycleSeconds = 0.0f;
     }
+
+    ResetAircraftCycleTimer();
 
     Radar_SetCenter(
         radarLat,
