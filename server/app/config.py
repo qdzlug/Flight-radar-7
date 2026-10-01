@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
@@ -75,6 +75,17 @@ class Settings:
     open_sky_timeout_s: float
     adsb_timeout_s: float
 
+    enrichment_provider: str
+    enrichment_cache_path: str
+    enrichment_ttl_s: float
+    enrichment_negative_ttl_s: float
+    enrichment_stale_grace_s: float
+    enrichment_timeout_s: float
+    enrichment_max_requests_hour: int
+    enrichment_max_requests_day: int
+    flightaware_api_key: str
+    flightaware_base_url: str
+
     host: str
     port: int
     log_level: str
@@ -82,6 +93,10 @@ class Settings:
     @property
     def has_opensky_credentials(self) -> bool:
         return bool(self.opensky_client_id and self.opensky_client_secret)
+
+    @property
+    def has_flightaware_credentials(self) -> bool:
+        return bool(self.flightaware_api_key)
 
 
 def load_settings() -> Settings:
@@ -113,6 +128,28 @@ def load_settings() -> Settings:
         drop_on_ground=_bool("DROP_ON_GROUND", False),
         open_sky_timeout_s=_seconds("OPENSKY_TIMEOUT_S", 12.0),
         adsb_timeout_s=_seconds("ADSB_TIMEOUT_S", 8.0),
+        enrichment_provider=_str("ENRICHMENT_PROVIDER", "none").lower(),
+        enrichment_cache_path=_str(
+            "ENRICHMENT_CACHE_PATH",
+            "./data/enrichment.sqlite3",
+        ),
+        enrichment_ttl_s=_seconds("ENRICHMENT_TTL_S", 600.0),
+        enrichment_negative_ttl_s=_seconds("ENRICHMENT_NEGATIVE_TTL_S", 900.0),
+        enrichment_stale_grace_s=_seconds("ENRICHMENT_STALE_GRACE_S", 86400.0),
+        enrichment_timeout_s=_seconds("ENRICHMENT_TIMEOUT_S", 2.0),
+        enrichment_max_requests_hour=max(
+            0,
+            _int("ENRICHMENT_MAX_REQUESTS_PER_HOUR", 30),
+        ),
+        enrichment_max_requests_day=max(
+            0,
+            _int("ENRICHMENT_MAX_REQUESTS_PER_DAY", 200),
+        ),
+        flightaware_api_key=_str("FLIGHTAWARE_API_KEY"),
+        flightaware_base_url=_str(
+            "FLIGHTAWARE_BASE_URL",
+            "https://aeroapi.flightaware.com/aeroapi",
+        ).rstrip("/"),
         host=_str("HOST", "0.0.0.0"),
         port=_int("PORT", 8000),
         log_level=_str("LOG_LEVEL", "info").lower(),

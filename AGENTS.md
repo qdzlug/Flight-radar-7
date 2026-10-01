@@ -71,8 +71,8 @@ wrong.
 
 **The ESP32 fetches into a 64 KiB buffer** (`responseCapacity` in
 `opensky_client.c`) and fails the entire request if the response overflows it.
-A merged row is about 160 bytes, so `MAX_STATES=150` lands near 23 KiB. Raising
-it much past ~350 risks the device silently discarding every response.
+A fully enriched row is about 220 bytes, so `MAX_STATES=150` lands near 33 KiB.
+Raising it much past ~250 risks the device silently discarding every response.
 
 **Non-ICAO addresses must be dropped.** readb sources prefix addresses derived
 from TIS-B or MLAT with `~`. Those are not real ICAO24 addresses, so they are

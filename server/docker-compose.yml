@@ -17,4 +17,14 @@ services:
       MAX_STATES: "${MAX_STATES:-150}"
       CACHE_TTL_S: "${CACHE_TTL_S:-5}"
       STALE_GRACE_S: "${STALE_GRACE_S:-120}"
+      ENRICHMENT_PROVIDER: "${ENRICHMENT_PROVIDER:-none}"
+      ENRICHMENT_CACHE_PATH: "/app/data/enrichment.sqlite3"
+      FLIGHTAWARE_API_KEY: "${FLIGHTAWARE_API_KEY:-}"
+      ENRICHMENT_MAX_REQUESTS_PER_HOUR: "${ENRICHMENT_MAX_REQUESTS_PER_HOUR:-30}"
+      ENRICHMENT_MAX_REQUESTS_PER_DAY: "${ENRICHMENT_MAX_REQUESTS_PER_DAY:-200}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
+    volumes:
+      - enrichment-data:/app/data
+
+volumes:
+  enrichment-data:

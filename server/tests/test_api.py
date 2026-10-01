@@ -197,3 +197,5 @@ def test_health(client, fetcher):
     assert body["status"] == "ok"
     assert "opensky" in body["sources"]
     assert body["cache"]["entries"] >= 0
+    assert body["enrichment"]["provider"] == "none"
+    assert body["enrichment"]["enabled"] is False

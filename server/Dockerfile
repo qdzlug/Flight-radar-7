@@ -12,7 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-RUN useradd --create-home --uid 10001 merge
+RUN useradd --create-home --uid 10001 merge \
+    && mkdir -p /app/data \
+    && chown merge:merge /app/data
 USER merge
 
 EXPOSE 8000

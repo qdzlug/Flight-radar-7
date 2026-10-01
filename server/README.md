@@ -26,7 +26,10 @@ four things:
 3. **More aircraft.** Anything an ADS-B source sees but OpenSky does not gets
    appended, including aircraft from a local receiver.
 4. **One upstream request per poll.** Requests are cached for a few seconds, so
-   several devices polling at once cost a single OpenSky call.
+    several devices polling at once cost a single OpenSky call.
+5. **Optional flight context.** A disabled-by-default enrichment pipeline can
+   add route, status and ETA data without making radar positions depend on a
+   paid provider.
 
 ## Quick start
 
@@ -103,13 +106,15 @@ also understands this service:
   "states": [
     ["801810", "AKJ645Y", "India", 1790380580, 1790380590, 77.6026, 13.2811,
      2141.2, false, 127.04, 7.21, 11.05, null, 2180.0, "2202", false, 0,
-     4, "B38M", "VT-YBK"]
+     4, "B38M", "VT-YBK", "QP645", "VOBL", "VIDP", "En Route",
+     1790384400, "Akasa Air", "flightaware", 1790380592, false]
   ],
   "meta": { "...": "merge counters and per source status" }
 }
 ```
 
-Each `states` row has exactly 20 fields, following the OpenSky layout:
+Each `states` row has exactly 29 fields. Indices 0-19 preserve the existing
+OpenSky-compatible layout:
 
 | Index | Field           | Unit                    | Index | Field           | Unit             |
 | ----- | --------------- | ----------------------- | ----- | --------------- | ---------------- |
@@ -125,8 +130,23 @@ Each `states` row has exactly 20 fields, following the OpenSky layout:
 | 9     | `velocity`      | m/s                     | 19    | `registration`  | e.g. `N123UA`    |
 
 Indices 18 and 19 extend the documented OpenSky layout; they are what the radar
-shows next to the callsign. Every row is padded to 20 fields, so consumers never
-see ragged arrays.
+shows next to the callsign. Optional commercial enrichment is appended without
+moving those fields:
+
+| Index | Field | Description |
+| ----- | ----- | ----------- |
+| 20 | `flight_number` | Provider-normalized flight number. |
+| 21 | `departure_airport` | ICAO airport code. |
+| 22 | `arrival_airport` | ICAO airport code. |
+| 23 | `flight_status` | Provider status text. |
+| 24 | `estimated_arrival` | Unix timestamp. |
+| 25 | `airline` | Airline/operator name. |
+| 26 | `enrichment_provider` | Provider that supplied the fields. |
+| 27 | `enrichment_updated_at` | Unix timestamp. |
+| 28 | `enrichment_stale` | Whether stale fallback data was used. |
+
+Every row is padded to 29 fields. Older consumers remain compatible because the
+first 20 indices are unchanged and enrichment is nullable.
 
 Units are SI everywhere. The ADS-B sources publish feet, knots and feet per
 minute, and the service converts on the way in — the firmware multiplies by
@@ -188,12 +208,36 @@ add your own ADS-B aggregator.
 | `PORT`               | `8000`  | Bind port.                                                                |
 | `LOG_LEVEL`          | `info`  | Python logging level.                                                     |
 
+### Optional flight enrichment
+
+Enrichment is local-only by default. It never blocks provider calls in the
+state response path: a new aircraft schedules a background lookup and a later
+poll receives cached fields.
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `ENRICHMENT_PROVIDER` | `none` | `none` or `flightaware`. |
+| `FLIGHTAWARE_API_KEY` | empty | AeroAPI key, retained server-side. |
+| `FLIGHTAWARE_BASE_URL` | FlightAware AeroAPI | Override for testing. |
+| `ENRICHMENT_CACHE_PATH` | `./data/enrichment.sqlite3` | Persistent SQLite cache. |
+| `ENRICHMENT_TTL_S` | `600` | Fresh positive result lifetime. |
+| `ENRICHMENT_NEGATIVE_TTL_S` | `900` | No-result lifetime. |
+| `ENRICHMENT_STALE_GRACE_S` | `86400` | Maximum stale fallback age. |
+| `ENRICHMENT_TIMEOUT_S` | `2` | Provider timeout. |
+| `ENRICHMENT_MAX_REQUESTS_PER_HOUR` | `30` | Hourly safety limit; `0` is unlimited. |
+| `ENRICHMENT_MAX_REQUESTS_PER_DAY` | `200` | Daily safety limit; `0` is unlimited. |
+
+If the API key is absent, the provider fails, a limit is reached, or SQLite is
+unavailable, the service still returns normal receiver/OpenSky state vectors.
+SQLite failure falls back to a volatile cache. Three consecutive provider
+failures open a one-minute circuit breaker.
+
 ### A note on `MAX_STATES`
 
 The firmware fetches into a 64 KiB buffer and fails the whole request if the
-response overflows it. A merged row is roughly 160 bytes, so `150` rows land
-near 23 KiB. Raising `MAX_STATES` towards `350` is still safe; beyond that,
-either the device will drop the response or the box should be tightened.
+response overflows it. A fully enriched row is roughly 220 bytes, so `150` rows
+land near 33 KiB. Keep `MAX_STATES` near its default; raising it much beyond
+`250` risks overflowing the device response buffer.
 
 ## API credit usage
 

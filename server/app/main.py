@@ -12,6 +12,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 
 from .config import Settings, load_settings
+from .enrichment import EnrichmentService, build_enrichment_service
 from .geo import BoundingBox, InvalidBox
 from .merge import merge
 from .sources import Source, SourceResult, build_sources
@@ -91,6 +92,7 @@ class Runtime:
     client: httpx.AsyncClient
     sources: list[Source]
     cache: MergeCache
+    enrichment: EnrichmentService
     started_at: float
 
 
@@ -114,25 +116,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     sources = build_sources(settings, client)
+    enrichment = build_enrichment_service(settings, client)
     runtime = Runtime(
         settings=settings,
         client=client,
         sources=sources,
         cache=MergeCache(settings.cache_ttl_s, settings.cache_max_entries),
+        enrichment=enrichment,
         started_at=time.time(),
     )
     app.state.runtime = runtime
 
     log.info(
-        "merge service ready: sources=%s opensky_auth=%s max_states=%d",
+        "merge service ready: sources=%s opensky_auth=%s enrichment=%s max_states=%d",
         [source.name for source in sources],
         settings.has_opensky_credentials,
+        enrichment.provider.name,
         settings.max_states,
     )
 
     try:
         yield
     finally:
+        await enrichment.close()
         await client.aclose()
 
 
@@ -183,6 +189,8 @@ async def build_payload(runtime: Runtime, box: BoundingBox) -> dict[str, Any] | 
         require_position=runtime.settings.require_position,
         drop_on_ground=runtime.settings.drop_on_ground,
     )
+
+    await runtime.enrichment.enrich_rows(rows)
 
     return {
         "time": int(time.time()),
@@ -281,6 +289,7 @@ async def index(
             "parameters": ["lamin", "lamax", "lomin", "lomax"],
             "example": "/states/all?lamin=13.1&lamax=13.3&lomin=77.6&lomax=77.8",
             "sources": [source.name for source in runtime.sources],
+            "enrichment_provider": runtime.enrichment.provider.name,
             "health": "/health",
             "docs": "/docs",
         }
@@ -298,5 +307,6 @@ async def health(request: Request) -> JSONResponse:
             "opensky_credentials": runtime.settings.has_opensky_credentials,
             "max_states": runtime.settings.max_states,
             "cache": runtime.cache.stats(),
+            "enrichment": await runtime.enrichment.health(),
         }
     )

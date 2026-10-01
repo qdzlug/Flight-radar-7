@@ -4,8 +4,8 @@ Every source is normalised into the positional array layout used by the
 OpenSky ``/states/all`` response so the ESP32 firmware can parse a single
 format regardless of where the data came from.
 
-Layout (index -> field), matching the OpenSky REST documentation plus the
-two enrichment fields the firmware reads:
+Layout (index -> field), matching the OpenSky REST documentation plus optional
+local and commercial enrichment fields:
 
      0 icao24            hex string, lower case
      1 callsign          8 chars, stripped, or null
@@ -27,6 +27,15 @@ two enrichment fields the firmware reads:
     17 category          OpenSky integer category, or null
     18 typecode          e.g. "A388", or null
     19 registration      e.g. "N123UA", or null
+    20 flight_number     provider-normalised number, or null
+    21 departure_airport ICAO code, or null
+    22 arrival_airport   ICAO code, or null
+    23 flight_status     provider-normalised status, or null
+    24 estimated_arrival unix seconds, or null
+    25 airline           airline/operator name, or null
+    26 enrichment_source provider name, or null
+    27 enrichment_time   unix seconds, or null
+    28 enrichment_stale  bool
 """
 
 from __future__ import annotations
@@ -34,7 +43,8 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable
 
-FIELD_COUNT = 20
+BASE_FIELD_COUNT = 20
+FIELD_COUNT = 29
 
 ICAO24 = 0
 CALLSIGN = 1
@@ -56,6 +66,15 @@ POSITION_SOURCE = 16
 CATEGORY = 17
 TYPECODE = 18
 REGISTRATION = 19
+FLIGHT_NUMBER = 20
+DEPARTURE_AIRPORT = 21
+ARRIVAL_AIRPORT = 22
+FLIGHT_STATUS = 23
+ESTIMATED_ARRIVAL = 24
+AIRLINE = 25
+ENRICHMENT_PROVIDER = 26
+ENRICHMENT_UPDATED_AT = 27
+ENRICHMENT_STALE = 28
 
 POSITION_SOURCE_ADSB = 0
 POSITION_SOURCE_MLAT = 2
@@ -176,7 +195,7 @@ def normalise_opensky_row(raw: Any) -> Row | None:
     # The remaining indices are copied positionally. OpenSky may return short
     # rows (an unauthenticated request omits the category), so anything past the
     # end of the source row stays null.
-    for index in range(1, min(len(raw), FIELD_COUNT)):
+    for index in range(1, min(len(raw), BASE_FIELD_COUNT)):
         row[index] = raw[index]
 
     row[CALLSIGN] = _text(row[CALLSIGN])
@@ -198,6 +217,7 @@ def normalise_opensky_row(raw: Any) -> Row | None:
 
     row[TYPECODE] = _text(row[TYPECODE])
     row[REGISTRATION] = _text(row[REGISTRATION])
+    row[ENRICHMENT_STALE] = False
 
     return row
 
@@ -279,6 +299,7 @@ def from_readb(aircraft: Any, now: float) -> Row | None:
     row[TYPECODE] = typecode if typecode and TYPECODE_RE.match(typecode) else None
 
     row[REGISTRATION] = _text(aircraft.get("r"))
+    row[ENRICHMENT_STALE] = False
 
     return row
 
