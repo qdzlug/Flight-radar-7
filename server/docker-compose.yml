@@ -5,7 +5,7 @@ services:
     container_name: flight-radar-merge
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${MERGE_PORT:-8000}:8000"
     environment:
       # Holding the OpenSky credentials here means the ESP32 never needs them:
       # point the device's data source at this service instead.

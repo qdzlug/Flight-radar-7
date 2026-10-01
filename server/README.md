@@ -208,6 +208,9 @@ add your own ADS-B aggregator.
 | `PORT`               | `8000`  | Bind port.                                                                |
 | `LOG_LEVEL`          | `info`  | Python logging level.                                                     |
 
+Docker Compose publishes the service on host port `8000` by default. Set
+`MERGE_PORT` when that port is already occupied, for example `MERGE_PORT=8001`.
+
 ### Optional flight enrichment
 
 Enrichment is local-only by default. It never blocks provider calls in the
