@@ -12,7 +12,7 @@ services:
       OPENSKY_CLIENT_ID: "${OPENSKY_CLIENT_ID:-}"
       OPENSKY_CLIENT_SECRET: "${OPENSKY_CLIENT_SECRET:-}"
       OPENSKY_EXTENDED: "${OPENSKY_EXTENDED:-false}"
-      ADSB_SOURCES: "${ADSB_SOURCES:-adsb.lol,adsb.fi}"
+      ADSB_SOURCES: "${ADSB_SOURCES:-adsb.im,adsb.lol,adsb.fi}"
       ADSB_IM_URL: "${ADSB_IM_URL:-http://192.168.217.205/v2}"
       TAR1090_URL: "${TAR1090_URL:-}"
       MAX_STATES: "${MAX_STATES:-150}"
