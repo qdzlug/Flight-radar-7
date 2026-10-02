@@ -1,7 +1,7 @@
 services:
   merge:
-    build: .
-    image: flight-radar-merge:latest
+    build:
+      context: .
     container_name: flight-radar-merge
     restart: unless-stopped
     ports:
