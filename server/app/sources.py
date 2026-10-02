@@ -258,6 +258,19 @@ class AdsbFiSource(ReadbSource):
         )
 
 
+class AdsbImSource(ReadbSource):
+    """adsb.im v2 API — same response shape as adsb.lol, different host."""
+
+    def __init__(self, base_url: str, timeout_s: float = 8.0) -> None:
+        super().__init__("adsb.im", base_url, timeout_s)
+
+    def url(self, box: BoundingBox) -> str:
+        return (
+            f"{self._base_url}/point/{box.center_lat:.4f}/"
+            f"{box.center_lon:.4f}/{box.query_radius_nm}"
+        )
+
+
 class CustomReadbSource(ReadbSource):
     """A user supplied readb v2 endpoint, e.g. ``custom=http://pi:8080/v2``."""
 
@@ -341,6 +354,8 @@ def build_sources(
             sources.append(AdsbLolSource(settings.adsb_lol_url, timeout))
         elif spec == "adsb.fi":
             sources.append(AdsbFiSource(settings.adsb_fi_url, timeout))
+        elif spec == "adsb.im":
+            sources.append(AdsbImSource(settings.adsb_im_url, timeout))
         elif spec == "tar1090":
             if settings.tar1090_url:
                 sources.append(Tar1090Source(settings.tar1090_url, timeout))

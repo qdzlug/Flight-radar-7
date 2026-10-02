@@ -64,6 +64,7 @@ class Settings:
     adsb_sources: list[str]
     adsb_lol_url: str
     adsb_fi_url: str
+    adsb_im_url: str
     tar1090_url: str
 
     cache_ttl_s: float
@@ -119,6 +120,7 @@ def load_settings() -> Settings:
             "ADSB_FI_URL",
             "https://opendata.adsb.fi/api/v2",
         ).rstrip("/"),
+        adsb_im_url=_str("ADSB_IM_URL", "http://192.168.217.205/v2").rstrip("/"),
         tar1090_url=_str("TAR1090_URL").rstrip("/"),
         cache_ttl_s=_seconds("CACHE_TTL_S", 5.0),
         cache_max_entries=_int("CACHE_MAX_ENTRIES", 64),
