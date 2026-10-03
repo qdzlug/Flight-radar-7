@@ -48,14 +48,15 @@ empty) and an optional local tar1090 concurrently, each under an overall
 deadline (`_collect` in `app/main.py`). `app/merge.py` combines them; the first
 source that answered is the base, so a failed OpenSky is not mislabelled in
 `meta`. `app/enrichment.py` optionally adds route/flight status from FlightAware
-(`ENRICHMENT_PROVIDER`, fail-open, cached in SQLite, rate limited). `app/statevector.py` normalises every source into
-the same 20-field row.
+(`ENRICHMENT_PROVIDER`, fail-open, cached in SQLite, rate limited).
+`app/statevector.py` normalises every source into the same 20-field row.
 
 - The data-source request uses an 8 s timeout (OpenSky keeps 15 s). After a
   failure with OpenSky credentials configured, the data source is skipped for
   60 s and the poll goes straight to OpenSky; `OpenSky_SetDataUrl()` clears the
-  backoff. Without credentials there is no fallback, so it keeps retrying. This
-  change has not been built or run on the device.
+  backoff. Without credentials there is no fallback, so it keeps retrying. Built
+  and flashed on 2026-10-02; the backoff log line (`Data source in backoff`)
+  was observed on the device.
 
 ## Details worth knowing
 
@@ -114,8 +115,19 @@ PATH="/usr/bin:/usr/sbin:/bin:/usr/local/bin:$PATH" \
   bash -c 'unset VIRTUAL_ENV; source ~/esp/esp-idf/export.sh; cd src && idf.py build'
 ```
 
-Flash and monitor use `/dev/cu.wchusbserial10` on this machine. The project
-targets `esp32s3`. `src/build/` and `.venv/` are ignored and must not be
+Flash and monitor use `/dev/cu.wchusbserial10` on the Mac. On the Linux dev box
+the board is `/dev/ttyUSB0` (CH340); `/dev/ttyACM0` is an unrelated device.
+
+Without a local ESP-IDF, build and flash with the `espressif/idf:v5.5.1` Docker
+image from a **scratch copy** of the repo, not the working tree:
+`src/dependencies.lock` is tracked and holds absolute `/Users/jschmidt/...`
+paths, and the container's IDF 5.5.1 rewrites its `idf` version (the Mac uses
+5.5.5). Copy the repo, `sed` those paths to `/project` in the copy, mount it at
+`/project`, then run `idf.py build` / `idf.py -p /dev/ttyUSB0 flash` with
+`--device /dev/ttyUSB0 --group-add <dialout gid>`. Mounting the working tree at
+the Mac path makes CMake hang. Flashing does not erase NVS.
+
+The project targets `esp32s3`. `src/build/` and `.venv/` are ignored and must not be
 committed.
 
 A pre-existing, unrelated warning: `bm8563_min.h` redefines `I2C_MASTER_NUM`,
@@ -183,6 +195,22 @@ OpenSky: Request URL: http://192.168.213.57:8000/states/all?lamin=38.949551&lama
 `192.168.212.0/24`.** Any of these work: run the service on a host on that
 subnet, put the Mac on the "Vicious" WiFi instead of the wired adapter, or add
 a port forward on the router.
+
+## Deployment status (2026-10-03)
+
+The merge service runs under Arcane at `http://docker01.virington.com:8001`
+(`192.168.213.78`, port 8001, not 8000). `/health` reports sources
+`opensky, adsb.im, adsb.lol, adsb.fi`, a 20 s cache TTL and FlightAware
+enrichment, so it is running commit `c605afb` or later. `ADSB_IM_URL` has no
+default; it must be set in the Arcane stack or `adsb.im` is skipped.
+
+The board has the new firmware (flashed 2026-10-02 from `/dev/ttyUSB0`) but its
+data source has not been confirmed as
+`http://docker01.virington.com:8001/states/all`. It could not be reached from
+the Linux dev box (no route to its Wi-Fi segment), so set it from a device on
+that Wi-Fi. At the last boot it also failed DNS for `auth.opensky-network.org`
+and logged a request centred on lat 0 / lon 0, so check the radar location in
+settings.
 
 ## Open issues
 
