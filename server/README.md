@@ -197,7 +197,7 @@ add your own ADS-B aggregator.
 | Variable             | Default | Description                                                              |
 | -------------------- | ------- | ------------------------------------------------------------------------ |
 | `MAX_STATES`         | `150`   | Maximum rows returned.                                                    |
-| `CACHE_TTL_S`        | `5`     | How long a merged response is reused.                                     |
+| `CACHE_TTL_S`        | `20`    | How long a merged response is reused.                                     |
 | `CACHE_MAX_ENTRIES`  | `64`    | Maximum cached bounding boxes.                                            |
 | `STALE_GRACE_S`      | `120`   | How long stale data may be served when all sources fail.                  |
 | `REQUIRE_POSITION`   | `true`  | Drop rows that have no latitude/longitude.                                |

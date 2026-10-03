@@ -199,3 +199,25 @@ def test_health(client, fetcher):
     assert body["cache"]["entries"] >= 0
     assert body["enrichment"]["provider"] == "none"
     assert body["enrichment"]["enabled"] is False
+
+
+def test_collect_enforces_overall_deadline():
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.geo import BoundingBox
+    from app.main import _collect
+    from app.sources import Source
+
+    class Hung(Source):
+        name = "hung"
+
+        async def fetch(self, client, box):
+            await asyncio.sleep(60)
+
+    settings = SimpleNamespace(open_sky_timeout_s=-2.5, adsb_timeout_s=-2.5)
+    runtime = SimpleNamespace(settings=settings, client=None, sources=[Hung()])
+    results = asyncio.run(_collect(runtime, BoundingBox(0.0, 1.0, 0.0, 1.0)))
+    assert len(results) == 1
+    assert not results[0].ok
+    assert "timeout" in results[0].error

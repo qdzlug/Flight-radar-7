@@ -354,3 +354,12 @@ class TestMerge:
         rows, stats = merge([], BANGALORE)
         assert rows == []
         assert stats.rows_out == 0
+
+
+def test_failed_opensky_does_not_mislabel_fallback_rows():
+    opensky = SourceResult(name="opensky", error="timeout")
+    adsb = SourceResult(name="adsb.lol", rows=[make_opensky_row()])
+    rows, stats = merge([opensky, adsb], BANGALORE)
+    assert len(rows) == 1
+    assert stats.from_opensky == 0
+    assert stats.added_by_adsb == 1

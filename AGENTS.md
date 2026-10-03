@@ -43,9 +43,19 @@ OpenSky's public API does not publish.
 
 `app/main.py` exposes `GET /states/all` (plus `/states` and `/`), takes the four
 OpenSky bounding-box parameters, and returns a merged response. `app/sources.py`
-fetches OpenSky, adsb.lol, adsb.fi and an optional local tar1090 concurrently.
-`app/merge.py` combines them. `app/statevector.py` normalises every source into
+fetches OpenSky, adsb.lol, adsb.fi, adsb.im (needs `ADSB_IM_URL`, skipped when
+empty) and an optional local tar1090 concurrently, each under an overall
+deadline (`_collect` in `app/main.py`). `app/merge.py` combines them; the first
+source that answered is the base, so a failed OpenSky is not mislabelled in
+`meta`. `app/enrichment.py` optionally adds route/flight status from FlightAware
+(`ENRICHMENT_PROVIDER`, fail-open, cached in SQLite, rate limited). `app/statevector.py` normalises every source into
 the same 20-field row.
+
+- The data-source request uses an 8 s timeout (OpenSky keeps 15 s). After a
+  failure with OpenSky credentials configured, the data source is skipped for
+  60 s and the poll goes straight to OpenSky; `OpenSky_SetDataUrl()` clears the
+  backoff. Without credentials there is no fallback, so it keeps retrying. This
+  change has not been built or run on the device.
 
 ## Details worth knowing
 
@@ -117,7 +127,7 @@ which `waveshare_rgb_lcd_port.h` already defines. It is harmless.
 python -m pytest server/tests -q
 ```
 
-45 tests, no network access. They cover unit conversion, the emitter category
+57 tests, no network access. They cover unit conversion, the emitter category
 map, merge precedence and conflict resolution, and the API's cache, stale
 serving and upstream-failure paths. The firmware has no test harness.
 
@@ -176,21 +186,9 @@ a port forward on the router.
 
 ## Open issues
 
-- The unreachable data source costs a full 15 s connect timeout on every poll
-  before the OpenSky fallback is even attempted, so a misconfigured or offline
-  source halves the effective poll rate. Consider a shorter connect timeout for
-  the data-source path, or remembering the last failure to skip straight to
-  fallback for a while.
-- Server cache TTL is 5 s while the device polls every 25 s, so essentially
-  every device request is a miss. A TTL near the device's poll interval (say
-  20 s) would let a second device, or a UI refresh, be served from cache.
-- `opendata.adsb.fi` was observed taking 40-60 s on some requests, well past
-  the 8 s `ADSB_TIMEOUT_S`. The per-request timeout in httpx is a read timeout,
-  so a slow trickling body can exceed the total budget. If this recurs, wrap the
-  whole fan-out in an overall `asyncio.timeout`.
-- `OpenSky_HasCredentials()` still logs the client id and secret at INFO on
-  every poll. That is a real credential leak into the serial console and the
-  device log; it should be reduced to a boolean or a redacted form.
+- The radar's config web server has no authentication; anyone on the Wi-Fi can
+  replace the OpenSky credentials or the data source URL.
+- `src/components/lvgl__lvgl` (including demos and assets) is committed in full.
 - OpenSky API credits are a per-day budget. The radar's default 25 s poll is
   about 3,450 requests/day, which exceeds the 400/day anonymous quota, so
   anonymous operation needs a longer poll interval or server-side credentials.

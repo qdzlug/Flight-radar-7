@@ -355,7 +355,10 @@ def build_sources(
         elif spec == "adsb.fi":
             sources.append(AdsbFiSource(settings.adsb_fi_url, timeout))
         elif spec == "adsb.im":
-            sources.append(AdsbImSource(settings.adsb_im_url, timeout))
+            if settings.adsb_im_url:
+                sources.append(AdsbImSource(settings.adsb_im_url, timeout))
+            else:
+                log.warning("ADSB_SOURCES lists adsb.im but ADSB_IM_URL is empty; skipping")
         elif spec == "tar1090":
             if settings.tar1090_url:
                 sources.append(Tar1090Source(settings.tar1090_url, timeout))

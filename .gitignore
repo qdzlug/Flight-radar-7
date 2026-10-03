@@ -24,3 +24,8 @@ server/data/
 .vscode/
 .idea/
 *.swp
+
+# Local credentials and tool state
+.opensky
+.arcane
+.codex/

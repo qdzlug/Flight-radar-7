@@ -160,8 +160,24 @@ def _runtime(request: Request) -> Runtime:
 
 async def _collect(runtime: Runtime, box: BoundingBox) -> list[SourceResult]:
     """Fetch every source concurrently, never raising."""
+    # Per-request httpx timeouts are read timeouts, so a slow trickling body
+    # can outlast them. Each fetch also gets a hard overall deadline.
+    deadline = max(runtime.settings.open_sky_timeout_s, runtime.settings.adsb_timeout_s) + 3.0
+
+    async def bounded(source: Source) -> SourceResult:
+        started = time.monotonic()
+        try:
+            async with asyncio.timeout(deadline):
+                return await source.fetch(runtime.client, box)
+        except TimeoutError:
+            return SourceResult(
+                name=source.name,
+                error=f"timeout: exceeded {deadline:.0f}s overall deadline",
+                duration_s=time.monotonic() - started,
+            )
+
     gathered = await asyncio.gather(
-        *(source.fetch(runtime.client, box) for source in runtime.sources),
+        *(bounded(source) for source in runtime.sources),
         return_exceptions=True,
     )
 

@@ -5,6 +5,7 @@
 
 #include "esp_http_client.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -16,6 +17,9 @@
 #include "cJSON.h"
 
 #include "esp_crt_bundle.h"
+
+/* Per-request HTTP timeouts; see the data source backoff notes below. */
+#define OPENSKY_TIMEOUT_MS 15000
 
 #define OPENSKY_NAMESPACE "opensky"
 #define RADAR_NAMESPACE "radar"
@@ -393,7 +397,7 @@ static bool RequestToken(void)
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
             //.cert_pem = (const char *)isrgrootx1_pem_start,
             .crt_bundle_attach = esp_crt_bundle_attach,
-            .timeout_ms = 15000,
+            .timeout_ms = OPENSKY_TIMEOUT_MS,
             .buffer_size = 8192,
             .buffer_size_tx = 4096,
         };
@@ -518,6 +522,18 @@ bool OpenSky_Init(void)
 static char dataUrl[128];
 static bool dataUrlLoaded = false;
 static SemaphoreHandle_t dataUrlMutex = NULL;
+
+/*
+ * An unreachable data source costs a whole connect timeout. Allow it less time
+ * than OpenSky (a LAN service answers in well under a second, the merge service
+ * itself gives up on slow upstreams after ~15 s), and after a failure skip it
+ * for a while so the OpenSky fallback is not delayed on every poll.
+ */
+#define DATA_SOURCE_TIMEOUT_MS 8000
+#define DATA_SOURCE_BACKOFF_US (60LL * 1000000LL)
+
+/* Guarded by dataUrlMutex. 0 means the data source is not in backoff. */
+static int64_t dataSourceRetryAtUs = 0;
 
 static void DataUrlLock(void)
 {
@@ -648,6 +664,8 @@ bool OpenSky_SetDataUrl(
 
     DataUrlLock();
 
+    dataSourceRetryAtUs = 0;
+
     strncpy(
         dataUrl,
         url,
@@ -682,6 +700,7 @@ bool OpenSky_HasCredentials(void)
 static bool FetchStates(
     const char *url,
     bool withAuth,
+    int timeoutMs,
     char *buffer,
     size_t bufferSize)
 {
@@ -702,7 +721,7 @@ static bool FetchStates(
         {
             .url = url,
             .event_handler = HttpEventHandler,
-            .timeout_ms = 15000,
+            .timeout_ms = timeoutMs,
             .buffer_size = 8192,
             .buffer_size_tx = 4096,
         };
@@ -789,6 +808,12 @@ bool OpenSky_GetAircraftJson(
     char url[512];
     char source[128];
 
+    /*
+     * Backing off only makes sense when there is somewhere else to go; with no
+     * OpenSky credentials the data source is the only option, so keep trying.
+     */
+    bool haveFallback = OpenSky_HasCredentials();
+
     if (OpenSky_HasDataSource())
     {
         DataUrlLock();
@@ -820,15 +845,43 @@ bool OpenSky_GetAircraftJson(
                 minLon,
                 maxLon);
 
-            if (FetchStates(url, false, buffer, bufferSize))
+            bool skip = false;
+
+            if (haveFallback)
+            {
+                DataUrlLock();
+
+                skip = esp_timer_get_time() < dataSourceRetryAtUs;
+
+                DataUrlUnlock();
+            }
+
+            if (skip)
+            {
+                ESP_LOGW(
+                    TAG,
+                    "Data source in backoff, using OpenSky directly");
+            }
+            else if (FetchStates(url, false, DATA_SOURCE_TIMEOUT_MS, buffer, bufferSize))
             {
                 return true;
             }
+            else if (haveFallback)
+            {
+                DataUrlLock();
 
-            ESP_LOGW(
-                TAG,
-                "Data source '%s' failed, falling back to OpenSky",
-                source);
+                dataSourceRetryAtUs =
+                    esp_timer_get_time() + DATA_SOURCE_BACKOFF_US;
+
+                DataUrlUnlock();
+
+                ESP_LOGW(
+                    TAG,
+                    "Data source '%s' failed, falling back to OpenSky "
+                    "and retrying it in %d s",
+                    source,
+                    (int)(DATA_SOURCE_BACKOFF_US / 1000000LL));
+            }
         }
     }
 
@@ -849,5 +902,5 @@ bool OpenSky_GetAircraftJson(
         minLon,
         maxLon);
 
-    return FetchStates(url, true, buffer, bufferSize);
+    return FetchStates(url, true, OPENSKY_TIMEOUT_MS, buffer, bufferSize);
 }

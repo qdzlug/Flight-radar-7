@@ -72,18 +72,25 @@ def merge(
     order: list[str] = []
     rows: dict[str, Row] = {}
 
-    base = results[0]
+    # The first source that answered is the base, so a failed OpenSky does not
+    # leave an empty base and mislabel the fallback rows as OpenSky's.
+    ok_results = [result for result in results if result.ok]
+    if not ok_results:
+        return [], stats
+
+    base = ok_results[0]
     for row in base.rows:
         icao24 = row[ICAO24]
         if icao24 in rows:
             continue
         rows[icao24] = list(row)
         order.append(icao24)
-    stats.from_opensky = len(order)
+    if base.name == "opensky":
+        stats.from_opensky = len(order)
+    else:
+        stats.added_by_adsb = len(order)
 
-    for result in results[1:]:
-        if not result.ok:
-            continue
+    for result in ok_results[1:]:
         for row in result.rows:
             icao24 = row[ICAO24]
             existing = rows.get(icao24)
